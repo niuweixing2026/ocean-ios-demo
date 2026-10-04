@@ -115,9 +115,11 @@ GitHub test 分支
         ↓
 GitHub Actions macOS Runner 远程构建
         ↓
-下载 Actions 构建产物到本机
+在 macOS Runner 上启动 iOS Simulator 并运行
         ↓
-本机安装到模拟器或 iPhone/iPad
+上传日志、截图或视频
+        ↓
+Windows 下载 Actions Artifact 查看结果
 ~~~
 
 这里要区分两个概念：
@@ -127,7 +129,7 @@ GitHub Actions macOS Runner 远程构建
 
 ### 6.1 远程构建模拟器包
 
-GitHub Actions 可以在 `macos-14` Runner 上构建 iOS Simulator 目标。这个流程不需要 Apple ID、证书或 Provisioning Profile，但产物只能安装到 Mac 上的 iOS Simulator，不能安装到实体 iPhone/iPad。
+GitHub Actions 可以在 `macos-14` Runner 上构建并运行 iOS Simulator。Windows 本机不能安装 Apple 的 iOS Simulator，因为 Simulator 依赖 macOS 和 Xcode。这个流程不需要 Apple ID、证书或 Provisioning Profile，也不涉及真机签名。
 
 典型构建命令：
 
@@ -140,11 +142,17 @@ xcodebuild \
   build
 ~~~
 
-下载 Actions 产物后，可在本机启动模拟器并安装：
+下面的命令应在 GitHub Actions 的 macOS Runner 上执行，而不是 Windows 本机：
 
 ~~~bash
+xcrun simctl list devices available
+xcrun simctl boot "iPhone 16"
 xcrun simctl install booted OceanDemo.app
+xcrun simctl launch booted com.zxfd.oceandemo
+xcrun simctl io booted screenshot simulator.png
 ~~~
+
+然后使用 `actions/upload-artifact` 上传 `simulator.png`、构建日志和其他测试结果，Windows 只负责从 GitHub Actions 下载并查看这些文件。
 
 ### 6.2 远程构建真机安装包
 
@@ -170,23 +178,23 @@ TEAM_ID
 
 证书、`.p12`、Provisioning Profile 和密码不能提交到 Git 仓库。Actions 中完成签名后，再使用 `xcodebuild -exportArchive` 导出 `.ipa` 并上传为 Artifact。
 
-### 6.3 本机安装远程产物
+### 6.3 Windows 本机能做什么
 
-下载 GitHub Actions 的 `.ipa` 后，在本机执行以下准备：
+当前不考虑真机时，Windows 本机不能安装或运行 iOS Simulator，也不能使用 `xcrun`、`simctl` 或 Xcode。Windows 本机可以执行以下工作：
 
-1. 连接 iPhone/iPad，并在设备上信任本机；
-2. iOS 16 及以上设备打开“设置 → 隐私与安全性 → 开发者模式”；
-3. 使用 Xcode 的 `Devices and Simulators`、Apple Configurator 或公司现有的设备安装工具安装 `.ipa`；
-4. 如果设备提示开发者不受信任，在“设置 → 通用 → VPN 与设备管理”中完成信任。
+1. 推送 `test` 分支，触发 GitHub Actions；
+2. 下载 Actions 上传的构建日志、Simulator 截图、视频和测试报告；
+3. 查看 Actions 的成功或失败状态；
+4. 通过远程 Mac、云 Mac 或团队成员的 Mac 进行交互式模拟器操作。
 
-安装是否成功取决于远程签名使用的 Team、Bundle ID、Provisioning Profile 和设备 UDID 是否一致。本机不需要重新编译，但必须使用与签名匹配的设备。
+如果确实需要在本机看到模拟器界面，必须使用 macOS 设备登录 GitHub 或远程桌面；Windows 没有官方受支持的 iOS Simulator 安装方式。
 
 ### 6.4 当前没有 Apple ID 时的结论
 
-- 只构建并下载 Simulator 包：现在可以进行，不需要 Apple ID；
-- 构建并安装到实体 iPhone/iPad：现在无法完成，必须先准备 Apple ID 和签名资源；
-- 仅注册普通 Apple ID 可以用于登录和个人开发测试，但 GitHub Actions 的稳定远程真机打包建议使用已加入 Apple Developer Program 的团队账号；
-- Apple ID、证书、Profile 准备好后，才能启用真机 `.ipa` 工作流。
+- 通过 GitHub Actions 在 macOS Runner 上构建、启动 Simulator 和上传截图：现在可以进行，不需要 Apple ID；
+- 在 Windows 本机安装 iOS Simulator：不支持，不能通过安装普通软件解决；
+- 下载 `.app` 到 Windows：只能保存或查看文件，不能在 Windows 上运行；
+- 后续如果改为实体 iPhone/iPad 安装，再准备 Apple ID、Apple Developer Program、证书和 Provisioning Profile。
 
 ## 7. iOS SDK 依赖现状
 
@@ -210,11 +218,11 @@ TEAM_ID
 
 当 SDK 依赖改为远程 Package 或 XCFramework 后，按以下顺序实现：
 
-1. `test` 分支触发 Simulator 构建，先验证 GitHub Actions 能正常解析 Demo 和 SDK 依赖；
-2. 上传 `.app`、构建日志和测试结果为 Artifact；
-3. Apple Developer 账号、证书和 Profile 准备好后，再增加 `iphoneos` Archive 和 `.ipa` 导出；
-4. 将签名文件仅保存到 GitHub Actions Secrets；
-5. 下载 `.ipa` 到本机，通过 Xcode Devices、Apple Configurator 或现有安装工具安装；
+1. `test` 分支触发 macOS Runner 构建；
+2. 在 Runner 上启动 iOS Simulator，安装并启动 Demo；
+3. 采集 Simulator 截图、日志和测试报告；
+4. 使用 `actions/upload-artifact` 上传结果，Windows 下载查看；
+5. 后续需要真机时，再增加 `iphoneos` Archive、签名和 `.ipa` 导出；
 6. `main` 用于主干构建，`v*` tag 用于版本构建。
 
 远程 Runner 使用 `macos-14`，构建使用 `xcodebuild`，产物使用 `actions/upload-artifact` 保存。未配置 Apple Developer 签名资源前，不要把未签名的 `iphoneos` 包标记为可安装真机包。

@@ -106,56 +106,87 @@ rg -n -I -i "(token|secret|password|private.?key|BEGIN RSA|BEGIN PRIVATE|\.p12|\
 
 项目根目录的 `.gitignore` 已用于过滤 Xcode 和 SwiftPM 临时文件。
 
-## 6. 真机测试与 Apple 账号
+## 6. GitHub 远程打包与本机安装
 
-当前需要进行 iPhone/iPad 真机测试，但项目还没有 Apple ID。需要先准备 Apple ID，再在 Xcode 中完成自动签名。
+目标流程是：
+
+~~~text
+GitHub test 分支
+        ↓
+GitHub Actions macOS Runner 远程构建
+        ↓
+下载 Actions 构建产物到本机
+        ↓
+本机安装到模拟器或 iPhone/iPad
+~~~
 
 这里要区分两个概念：
 
-- **Apple ID**：登录 Apple Developer、Xcode 和设备的账号；
-- **Apple App ID**：Apple Developer 中用于标识 App 的配置，通常由 Team ID 和 Bundle ID 组成，当前工程的 Bundle ID 是 `com.zxfd.oceandemo`。
+- **Apple ID**：登录 Apple Developer 和管理签名资源的账号；
+- **Apple App ID**：Apple Developer 中的 App 标识，通常由 Team ID 和 Bundle ID 组成；当前工程的 Bundle ID 是 `com.zxfd.oceandemo`。
 
-### 6.1 准备 Apple ID
+### 6.1 远程构建模拟器包
 
-1. 在 <https://appleid.apple.com> 注册 Apple ID，并完成邮箱和手机号验证。
-2. 为 Apple ID 开启双重认证；Apple Developer 和 Xcode 登录通常要求双重认证。
-3. 在 Mac 上打开 Xcode → `Settings` → `Accounts` → `+`，登录该 Apple ID。
-4. 连接 iPhone/iPad，首次连接时在设备上选择“信任此电脑”。
-5. iOS 16 及以上设备在“设置 → 隐私与安全性 → 开发者模式”中开启开发者模式。
+GitHub Actions 可以在 `macos-14` Runner 上构建 iOS Simulator 目标。这个流程不需要 Apple ID、证书或 Provisioning Profile，但产物只能安装到 Mac 上的 iOS Simulator，不能安装到实体 iPhone/iPad。
 
-### 6.2 免费个人账号的适用范围
+典型构建命令：
 
-没有加入 Apple Developer Program 时，Xcode 可以使用 Personal Team 进行本地真机调试，但存在限制：
+~~~bash
+xcodebuild \
+  -project OceanDemo.xcodeproj \
+  -scheme OceanDemo \
+  -destination "generic/platform=iOS Simulator" \
+  -configuration Debug \
+  build
+~~~
 
-- 签名和安装有效期较短，通常需要定期重新运行；
-- 可用的设备、App ID 和系统能力受到限制；
-- 不能用于 TestFlight、App Store 发布和团队正式分发；
-- Universal Link、Push、部分第三方回跳能力可能还需要付费开发者团队配置。
+下载 Actions 产物后，可在本机启动模拟器并安装：
 
-因此，免费 Apple ID 只适合当前阶段的个人真机联调。多人协作、长期测试、TestFlight 或正式发布需要加入 Apple Developer Program。
+~~~bash
+xcrun simctl install booted OceanDemo.app
+~~~
 
-### 6.3 Xcode 真机签名配置
+### 6.2 远程构建真机安装包
 
-在 Xcode 中打开 `OceanDemo.xcodeproj`：
+如果目标是“GitHub 远程打包后安装到本机 iPhone/iPad”，Actions 必须生成已签名的 `.ipa` 或已签名 `.app`。未签名的 `iphoneos` 构建产物不能直接安装到真机。
 
-1. 选择 `OceanDemo` Target → `Signing & Capabilities`。
-2. 勾选 `Automatically manage signing`。
-3. 在 `Team` 中选择刚登录的 Personal Team 或公司开发团队。
-4. 如果 Bundle ID 冲突，将 `com.zxfd.oceandemo` 改为团队内唯一的 Bundle ID。
-5. 将运行目标切换为已连接的 iPhone/iPad，点击 Run。
-6. 首次运行若提示开发者不受信任，按设备提示完成信任操作后重新运行。
+真机远程打包需要准备：
 
-### 6.4 什么时候需要付费 Apple Developer Program
+1. Apple ID，并加入 Apple Developer Program；
+2. App ID/Bundle ID：`com.zxfd.oceandemo`；
+3. Distribution 或 Development 证书；
+4. 与设备 UDID 匹配的 Provisioning Profile；
+5. 将证书和 Profile 以 GitHub Actions Secrets 形式保存。
 
-以下需求需要公司或个人加入 Apple Developer Program，并由团队管理员统一管理证书和权限：
+推荐的 Actions Secrets 名称：
 
-- 长期真机测试和多人协作；
-- TestFlight 内测；
-- Universal Link、Push、Associated Domains 等能力；
-- 生成正式签名的 `.app`、`.framework` 或 `.xcarchive`；
-- App Store 发布。
+~~~text
+BUILD_CERTIFICATE_BASE64
+P12_PASSWORD
+PROVISIONING_PROFILE_BASE64
+KEYCHAIN_PASSWORD
+TEAM_ID
+~~~
 
-仅将 Demo 源码上传到 GitHub，或使用 Xcode Simulator 编译，不需要 Apple ID、Apple App ID 或签名证书；但本节所述的真机测试需要至少一个可登录 Xcode 的 Apple ID。
+证书、`.p12`、Provisioning Profile 和密码不能提交到 Git 仓库。Actions 中完成签名后，再使用 `xcodebuild -exportArchive` 导出 `.ipa` 并上传为 Artifact。
+
+### 6.3 本机安装远程产物
+
+下载 GitHub Actions 的 `.ipa` 后，在本机执行以下准备：
+
+1. 连接 iPhone/iPad，并在设备上信任本机；
+2. iOS 16 及以上设备打开“设置 → 隐私与安全性 → 开发者模式”；
+3. 使用 Xcode 的 `Devices and Simulators`、Apple Configurator 或公司现有的设备安装工具安装 `.ipa`；
+4. 如果设备提示开发者不受信任，在“设置 → 通用 → VPN 与设备管理”中完成信任。
+
+安装是否成功取决于远程签名使用的 Team、Bundle ID、Provisioning Profile 和设备 UDID 是否一致。本机不需要重新编译，但必须使用与签名匹配的设备。
+
+### 6.4 当前没有 Apple ID 时的结论
+
+- 只构建并下载 Simulator 包：现在可以进行，不需要 Apple ID；
+- 构建并安装到实体 iPhone/iPad：现在无法完成，必须先准备 Apple ID 和签名资源；
+- 仅注册普通 Apple ID 可以用于登录和个人开发测试，但 GitHub Actions 的稳定远程真机打包建议使用已加入 Apple Developer Program 的团队账号；
+- Apple ID、证书、Profile 准备好后，才能启用真机 `.ipa` 工作流。
 
 ## 7. iOS SDK 依赖现状
 
@@ -175,18 +206,18 @@ rg -n -I -i "(token|secret|password|private.?key|BEGIN RSA|BEGIN PRIVATE|\.p12|\
 
 在 SDK 依赖方案确定前，不要添加会执行 `ocean-ios-sdk` 构建的 GitHub Actions 工作流，否则公共 Runner 会因找不到本地依赖而失败。
 
-## 8. 后续 GitHub Actions 规划
+## 8. GitHub Actions 实施顺序
 
-当 SDK 依赖改为远程 Package 或 XCFramework 后，再在本仓库增加：
+当 SDK 依赖改为远程 Package 或 XCFramework 后，按以下顺序实现：
 
-- `test` 分支：执行 Demo 编译检查；
-- `main` 分支：执行主干编译检查；
-- `v*` tag：执行版本构建或归档；
-- `macos-14`：作为公共 macOS Runner；
-- `xcodebuild`：执行 Xcode 工程构建；
-- `actions/upload-artifact`：保存构建日志或测试产物。
+1. `test` 分支触发 Simulator 构建，先验证 GitHub Actions 能正常解析 Demo 和 SDK 依赖；
+2. 上传 `.app`、构建日志和测试结果为 Artifact；
+3. Apple Developer 账号、证书和 Profile 准备好后，再增加 `iphoneos` Archive 和 `.ipa` 导出；
+4. 将签名文件仅保存到 GitHub Actions Secrets；
+5. 下载 `.ipa` 到本机，通过 Xcode Devices、Apple Configurator 或现有安装工具安装；
+6. `main` 用于主干构建，`v*` tag 用于版本构建。
 
-真机归档、签名和发布流程必须等 Apple Developer 配置完成后再启用。
+远程 Runner 使用 `macos-14`，构建使用 `xcodebuild`，产物使用 `actions/upload-artifact` 保存。未配置 Apple Developer 签名资源前，不要把未签名的 `iphoneos` 包标记为可安装真机包。
 
 ## 9. 常用检查命令
 

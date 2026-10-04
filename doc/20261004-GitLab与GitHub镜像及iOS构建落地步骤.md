@@ -218,7 +218,7 @@ TEAM_ID
 
 当前目标是：Windows 提交代码，GitHub Actions 使用 macOS Runner 构建并运行 iOS Simulator，Windows 下载截图、日志和测试结果。Windows 不安装 iOS Simulator。
 
-### 8.1 第一步：先解决 SDK 依赖
+### 8.1 第一步：确定当前可执行方案
 
 当前 `OceanDemo.xcodeproj` 使用本地依赖：
 
@@ -228,13 +228,36 @@ TEAM_ID
 
 GitHub Actions 只会检出 `ocean-ios-demo`，不会自动拥有同级的 `ocean-ios-sdk` 目录。因此，直接创建 Workflow 会在 Xcode 构建阶段失败。
 
-先选择一种依赖方案：
+基于当前环境，已选择**方案 3：仅做源码展示，暂不执行 Xcode 构建**。
 
-1. 将 `OceanPaySDK` 发布成远程 Swift Package，把 Xcode 工程的本地依赖改成 GitHub/GitLab Package URL；
-2. 将 `OceanPaySDK.xcframework` 放入 Demo 仓库并在 Xcode 工程中配置链接；
-3. 仅做源码展示，不执行 Xcode 构建。
+选择原因：
 
-只有完成第 1 或第 2 种方案后，才继续执行本节的构建步骤。
+| 方案 | 当前是否可行 | 原因 |
+| --- | --- | --- |
+| 1. 远程 Swift Package | 暂不可行 | SDK 目前在内部 GitLab，地址属于 `172.17.*` 内网，GitHub 公共 macOS Runner 无法直接访问；如果改为公开 SDK，还会改变“只上传 Demo”的范围 |
+| 2. XCFramework | 暂不可行 | 当前没有现成的 `OceanPaySDK.xcframework`，Windows 也不能直接执行 Xcode 归档生成它 |
+| 3. 源码展示 | 当前可行 | 不需要 Apple ID、Mac、证书或 SDK 构建产物，可以先完成 Demo 仓库和 GitHub 镜像 |
+
+因此当前只执行：
+
+1. 将 Demo 源码、工程文件和文档同步到 GitHub；
+2. 在 GitHub 上保留 `main`、`test` 分支；
+3. 暂不创建或运行 `ios-demo-simulator.yml`；
+4. 暂不配置 `xcodebuild`、`simctl` 和 macOS Runner 构建。
+
+本章 8.2 至 8.9 是后续切换到方案 1 或方案 2 后的操作手册，当前不要直接照做。否则 Workflow 会因为找不到 `../ocean-ios-sdk` 而失败。
+
+### 8.1.1 后续切换到方案 2 的条件
+
+后续只要获得一份由 macOS/Xcode 构建的 `OceanPaySDK.xcframework`，就可以切换到方案 2：
+
+1. 将 `OceanPaySDK.xcframework` 放入 Demo 仓库指定目录；
+2. 修改 `OceanDemo.xcodeproj`，移除 `../ocean-ios-sdk` 本地 Package 引用；
+3. 将 XCFramework 加入 `Frameworks, Libraries, and Embedded Content`；
+4. 本地仅需提交工程配置和 XCFramework 文件，不需要把 SDK 源码放进 Demo 仓库；
+5. 再按照 8.2 至 8.9 创建 GitHub Actions Simulator Workflow。
+
+这是当前最适合“只公开 Demo、后续由 GitHub Actions 构建”的升级路径，但前提是先由可用的 macOS 环境生成 XCFramework。
 
 ### 8.2 第二步：检查 GitHub 仓库和分支
 

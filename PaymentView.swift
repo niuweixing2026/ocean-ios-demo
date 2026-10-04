@@ -47,9 +47,17 @@ struct DemoData: Codable {
     }
 }
 
-struct DemoPaymentResult: Identifiable {
+struct DemoPaymentResult: Identifiable, Hashable {
     let id = UUID()
     let result: OceanPaymentResult
+
+    static func == (lhs: DemoPaymentResult, rhs: DemoPaymentResult) -> Bool {
+        lhs.id == rhs.id
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
 }
 
 enum DemoRequestError: LocalizedError {

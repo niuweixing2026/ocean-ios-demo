@@ -214,18 +214,201 @@ TEAM_ID
 
 在 SDK 依赖方案确定前，不要添加会执行 `ocean-ios-sdk` 构建的 GitHub Actions 工作流，否则公共 Runner 会因找不到本地依赖而失败。
 
-## 8. GitHub Actions 实施顺序
+## 8. 第一次使用 GitHub Actions 的完整操作
 
-当 SDK 依赖改为远程 Package 或 XCFramework 后，按以下顺序实现：
+当前目标是：Windows 提交代码，GitHub Actions 使用 macOS Runner 构建并运行 iOS Simulator，Windows 下载截图、日志和测试结果。Windows 不安装 iOS Simulator。
 
-1. `test` 分支触发 macOS Runner 构建；
-2. 在 Runner 上启动 iOS Simulator，安装并启动 Demo；
-3. 采集 Simulator 截图、日志和测试报告；
-4. 使用 `actions/upload-artifact` 上传结果，Windows 下载查看；
-5. 后续需要真机时，再增加 `iphoneos` Archive、签名和 `.ipa` 导出；
-6. `main` 用于主干构建，`v*` tag 用于版本构建。
+### 8.1 第一步：先解决 SDK 依赖
 
-远程 Runner 使用 `macos-14`，构建使用 `xcodebuild`，产物使用 `actions/upload-artifact` 保存。未配置 Apple Developer 签名资源前，不要把未签名的 `iphoneos` 包标记为可安装真机包。
+当前 `OceanDemo.xcodeproj` 使用本地依赖：
+
+~~~text
+../ocean-ios-sdk
+~~~
+
+GitHub Actions 只会检出 `ocean-ios-demo`，不会自动拥有同级的 `ocean-ios-sdk` 目录。因此，直接创建 Workflow 会在 Xcode 构建阶段失败。
+
+先选择一种依赖方案：
+
+1. 将 `OceanPaySDK` 发布成远程 Swift Package，把 Xcode 工程的本地依赖改成 GitHub/GitLab Package URL；
+2. 将 `OceanPaySDK.xcframework` 放入 Demo 仓库并在 Xcode 工程中配置链接；
+3. 仅做源码展示，不执行 Xcode 构建。
+
+只有完成第 1 或第 2 种方案后，才继续执行本节的构建步骤。
+
+### 8.2 第二步：检查 GitHub 仓库和分支
+
+在 Windows 浏览器打开：
+
+<https://github.com/niuweixing2026/ocean-ios-demo>
+
+依次检查：
+
+1. 点击 `Code`，确认能看到 `OceanDemo.xcodeproj`、Swift 源码和 `doc` 目录；
+2. 点击分支下拉框，确认存在 `main` 和 `test`；
+3. 切换到 `test`，确认最新提交是准备构建的版本；
+4. 点击 `Settings` → `Actions` → `General`；
+5. 确认 `Actions permissions` 允许使用 Actions；
+6. 在 `Workflow permissions` 中选择默认的只读权限即可，本次构建不需要写仓库；
+7. 点击 `Save` 保存设置。
+
+如果仓库是由 GitLab 镜像到 GitHub，必须确认包含 `.github/workflows/*.yml` 的提交已经同步到 GitHub；只有 GitLab 本地有文件，GitHub Actions 不会看到它。
+
+### 8.3 第三步：创建 Workflow 文件
+
+在本地项目创建文件：
+
+~~~text
+.github/workflows/ios-demo-simulator.yml
+~~~
+
+文件内容示例：
+
+~~~yaml
+name: iOS Demo Simulator
+
+on:
+  push:
+    branches:
+      - test
+  workflow_dispatch:
+
+jobs:
+  build-and-simulate:
+    runs-on: macos-14
+    timeout-minutes: 30
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 查看 Xcode 版本
+        run: xcodebuild -version
+
+      - name: 查看工程 Scheme
+        run: xcodebuild -project OceanDemo.xcodeproj -list
+
+      - name: 构建 iOS Simulator App
+        run: >-
+          xcodebuild
+          -project OceanDemo.xcodeproj
+          -scheme OceanDemo
+          -destination "generic/platform=iOS Simulator"
+          -configuration Debug
+          -derivedDataPath build/DerivedData
+          build
+
+      - name: 启动模拟器并运行 Demo
+        run: |
+          DEVICE_ID=$(xcrun simctl list devices available | grep -m 1 -E 'iPhone.*\(.*\)' | sed -E 's/.*\(([A-F0-9-]+)\).*/\1/')
+          test -n "$DEVICE_ID"
+          xcrun simctl boot "$DEVICE_ID" || true
+          xcrun simctl bootstatus "$DEVICE_ID" -b
+          xcrun simctl install "$DEVICE_ID" build/DerivedData/Build/Products/Debug-iphonesimulator/OceanDemo.app
+          xcrun simctl launch "$DEVICE_ID" com.zxfd.oceandemo
+          xcrun simctl io "$DEVICE_ID" screenshot build/simulator.png
+
+      - name: 上传构建结果
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-demo-simulator-result
+          path: |
+            build/DerivedData/Build/Products/Debug-iphonesimulator/OceanDemo.app
+            build/simulator.png
+          if-no-files-found: warn
+~~~
+
+说明：
+
+- `push.branches.test`：向 `test` 推送时自动触发；
+- `workflow_dispatch`：允许在 GitHub 页面手动点击运行；
+- `macos-14`：GitHub 提供的 macOS Runner，负责运行 Xcode 和 iOS Simulator；
+- `derivedDataPath`：把构建产物固定到 `build/DerivedData`，便于上传；
+- `if: always()`：即使构建失败，也尽量上传已有日志或截图；
+- 该 Workflow 只构建 Simulator，不需要 Apple ID、证书或 Provisioning Profile。
+
+### 8.4 第四步：提交并推送 Workflow
+
+在 Windows PowerShell 执行：
+
+~~~powershell
+Set-Location D:\project\xiaogun\tool\ocean-ios-demo
+git switch test
+git status --short
+git add .github/workflows/ios-demo-simulator.yml
+git commit -m "新增 iOS Demo 模拟器构建工作流"
+git push gitlab test
+git push github test
+~~~
+
+推荐先推送 GitLab，再推送 GitHub。推送后在 GitHub 的 `Code` 页面切换到 `test`，确认能看到 `.github/workflows/ios-demo-simulator.yml`。
+
+如果 GitHub 推送网络超时，不要重复创建提交；确认本地提交已经存在，网络恢复后只需再次执行：
+
+~~~powershell
+git push github test
+~~~
+
+### 8.5 第五步：在 GitHub 页面手动运行
+
+首次运行建议手动触发，操作如下：
+
+1. 打开 GitHub 仓库，点击顶部 `Actions`；
+2. 左侧选择 `iOS Demo Simulator`；
+3. 点击右侧 `Run workflow`；
+4. Branch 选择 `test`；
+5. 点击绿色的 `Run workflow`；
+6. 等待任务进入 `In progress`，点击进入查看每个 Step 的日志；
+7. 看到绿色 `build-and-simulate` 表示成功；
+8. 如果失败，展开第一个红色 Step，复制错误日志定位问题。
+
+### 8.6 第六步：下载构建结果到 Windows
+
+任务成功后：
+
+1. 在该次 Workflow 运行页面底部找到 `Artifacts`；
+2. 点击 `ios-demo-simulator-result` 下载 ZIP；
+3. 在 Windows 解压 ZIP；
+4. 查看 `simulator.png`；
+5. 查看 `OceanDemo.app` 是否存在；
+6. 查看构建日志确认使用的 Xcode 和目标设备版本。
+
+Windows 可以保存和查看这些文件，但不能直接运行 `OceanDemo.app`，也不能启动 iOS Simulator。
+
+### 8.7 第七步：确认自动触发
+
+手动运行成功后，在 Windows 修改 Demo 文件并提交到 `test`：
+
+~~~powershell
+git add <变更文件>
+git commit -m "更新 iOS Demo"
+git push gitlab test
+git push github test
+~~~
+
+每次 GitHub 收到 `test` 分支的新提交后，`push` 规则会自动触发 Workflow。可以在 `Actions` 页面查看新的运行记录。
+
+### 8.8 常见失败和处理方法
+
+| 现象 | 原因 | 处理方式 |
+| --- | --- | --- |
+| Actions 页面没有 Workflow | `.yml` 没推到 GitHub，或 Actions 被禁用 | 检查 `test` 分支文件和 `Settings → Actions` |
+| `xcodebuild -list` 失败 | 工程文件或 Scheme 名称不对 | 查看日志，确认 Scheme 是否为 `OceanDemo` |
+| 找不到 `ocean-ios-sdk` | 工程仍引用本地 `../ocean-ios-sdk` | 改远程 Package 或加入 XCFramework |
+| 找不到 `OceanDemo.app` | 构建失败或产物路径不同 | 查看构建 Step，必要时执行 `find build -name OceanDemo.app` |
+| `simctl install` 失败 | App 没有生成或目标不是 Simulator | 确认使用 `generic/platform=iOS Simulator` |
+| Workflow 排队很久 | 公共 macOS Runner 排队或配额限制 | 等待 Runner，查看 Actions 运行详情 |
+| Windows 无法打开 `.app` | `.app` 是 macOS/iOS 产物 | 只能下载查看，运行必须在 macOS Runner 或 Mac 上 |
+
+### 8.9 后续分支规则
+
+1. `test`：首次构建和日常 Demo 验证；
+2. `main`：确认通过后的主干构建；
+3. `v*` tag：后续版本构建；
+4. 当前不配置 `iphoneos`、证书、Profile 和 `.ipa`，因为暂时不考虑真机。
+
+远程 Runner 使用 `macos-14`，构建使用 `xcodebuild`，模拟器使用 `xcrun simctl`，截图和日志使用 `actions/upload-artifact` 保存。
 
 ## 9. 常用检查命令
 

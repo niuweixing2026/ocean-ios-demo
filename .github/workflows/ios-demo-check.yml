@@ -1,0 +1,21 @@
+name: iOS Demo Runner Check
+
+on:
+  push:
+    branches:
+      - test
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: macos-14
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 查看 Xcode 版本
+        run: xcodebuild -version
+
+      - name: 查看可用模拟器
+        run: xcrun simctl list devices available

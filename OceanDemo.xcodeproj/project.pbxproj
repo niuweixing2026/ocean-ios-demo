@@ -1,0 +1,61 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A00000000000000000000001 /* OceanDemoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000011 /* OceanDemoApp.swift */; };
+		A00000000000000000000002 /* PaymentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000012 /* PaymentView.swift */; };
+		A00000000000000000000003 /* OceanPaySDK in Frameworks */ = {isa = PBXBuildFile; productRef = A00000000000000000000082 /* OceanPaySDK */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		A00000000000000000000010 /* OceanDemo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OceanDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A00000000000000000000011 /* OceanDemoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OceanDemoApp.swift; sourceTree = "<group>"; };
+		A00000000000000000000012 /* PaymentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaymentView.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A00000000000000000000020 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (A00000000000000000000003 /* OceanPaySDK in Frameworks */,); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A00000000000000000000030 = {isa = PBXGroup; children = (A00000000000000000000031, A00000000000000000000032,); sourceTree = "<group>"; };
+		A00000000000000000000031 /* Sources */ = {isa = PBXGroup; children = (A00000000000000000000011, A00000000000000000000012,); path = .; sourceTree = "<group>"; };
+		A00000000000000000000032 /* Products */ = {isa = PBXGroup; children = (A00000000000000000000010,); name = Products; sourceTree = "<group>"; };
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A00000000000000000000040 /* OceanDemo */ = {isa = PBXNativeTarget; buildConfigurationList = A00000000000000000000060; buildPhases = (A00000000000000000000041, A00000000000000000000020,); buildRules = (); dependencies = (); name = OceanDemo; packageProductDependencies = (A00000000000000000000082 /* OceanPaySDK */,); productName = OceanDemo; productReference = A00000000000000000000010; productType = "com.apple.product-type.application"; };
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A00000000000000000000050 /* Project object */ = {isa = PBXProject; attributes = {LastUpgradeCheck = 1600; TargetAttributes = {A00000000000000000000040 = {CreatedOnToolsVersion = 16.0; }; }; }; buildConfigurationList = A00000000000000000000061; compatibilityVersion = "Xcode 3.2"; developmentRegion = en; hasScannedForEncodings = 0; mainGroup = A00000000000000000000030; packageReferences = (A00000000000000000000081 /* XCLocalSwiftPackageReference "ocean-ios-sdk" */,); productRefGroup = A00000000000000000000032; projectDirPath = ""; projectRoot = ""; targets = (A00000000000000000000040,); };
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A00000000000000000000041 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A00000000000000000000001, A00000000000000000000002,); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXResourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		A00000000000000000000070 = {isa = XCBuildConfiguration; buildSettings = {INFOPLIST_FILE = Info.plist; IPHONEOS_DEPLOYMENT_TARGET = 16.0; PRODUCT_BUNDLE_IDENTIFIER = com.zxfd.oceandemo; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1,2"; }; name = Debug; };
+		A00000000000000000000071 = {isa = XCBuildConfiguration; buildSettings = {INFOPLIST_FILE = Info.plist; IPHONEOS_DEPLOYMENT_TARGET = 16.0; PRODUCT_BUNDLE_IDENTIFIER = com.zxfd.oceandemo; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1,2"; }; name = Release; };
+		A00000000000000000000072 = {isa = XCBuildConfiguration; buildSettings = {ALWAYS_SEARCH_USER_PATHS = NO; CLANG_ENABLE_MODULES = YES; SWIFT_OPTIMIZATION_LEVEL = "-Onone"; }; name = Debug; };
+		A00000000000000000000073 = {isa = XCBuildConfiguration; buildSettings = {ALWAYS_SEARCH_USER_PATHS = NO; CLANG_ENABLE_MODULES = YES; SWIFT_OPTIMIZATION_LEVEL = "-O"; }; name = Release; };
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A00000000000000000000060 = {isa = XCConfigurationList; buildConfigurations = (A00000000000000000000070, A00000000000000000000071,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		A00000000000000000000061 = {isa = XCConfigurationList; buildConfigurations = (A00000000000000000000072, A00000000000000000000073,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		A00000000000000000000081 /* XCLocalSwiftPackageReference "ocean-ios-sdk" */ = {isa = XCLocalSwiftPackageReference; relativePath = ../ocean-ios-sdk; };
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		A00000000000000000000082 /* OceanPaySDK */ = {isa = XCSwiftPackageProductDependency; package = A00000000000000000000081 /* XCLocalSwiftPackageReference "ocean-ios-sdk" */; productName = OceanPaySDK; };
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = A00000000000000000000050 /* Project object */;
+}

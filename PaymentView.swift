@@ -261,8 +261,13 @@ struct PaymentView: View {
             .scrollDismissesKeyboard(.interactively)
             .background(Color(red: 0.96, green: 0.97, blue: 0.98).ignoresSafeArea())
             .navigationTitle("支付 Demo")
-            .navigationDestination(item: $model.paymentResult) { value in
-                ResultView(result: value.result)
+            .background {
+                NavigationLink(item: $model.paymentResult) { value in
+                    ResultView(result: value.result)
+                } label: {
+                    EmptyView()
+                }
+                .frame(width: 0, height: 0)
             }
             .background(ViewControllerResolver { model.presenter = $0 }.frame(width: 0, height: 0))
             .task { model.load() }

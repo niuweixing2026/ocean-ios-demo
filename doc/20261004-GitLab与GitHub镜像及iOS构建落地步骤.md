@@ -106,16 +106,56 @@ rg -n -I -i "(token|secret|password|private.?key|BEGIN RSA|BEGIN PRIVATE|\.p12|\
 
 项目根目录的 `.gitignore` 已用于过滤 Xcode 和 SwiftPM 临时文件。
 
-## 6. Apple App ID 说明
+## 6. 真机测试与 Apple 账号
 
-仅将 Demo 源码上传到 GitHub，不需要 Apple App ID、Apple Developer 账号、证书或 Provisioning Profile。
+当前需要进行 iPhone/iPad 真机测试，但项目还没有 Apple ID。需要先准备 Apple ID，再在 Xcode 中完成自动签名。
 
-以下场景才需要 Apple Developer 配置：
+这里要区分两个概念：
 
-- 真机安装和真机回归；
-- 配置 Bundle ID、签名证书和 Provisioning Profile；
-- Universal Link、URL Scheme、微信/支付宝回跳；
-- TestFlight 或 App Store 发布。
+- **Apple ID**：登录 Apple Developer、Xcode 和设备的账号；
+- **Apple App ID**：Apple Developer 中用于标识 App 的配置，通常由 Team ID 和 Bundle ID 组成，当前工程的 Bundle ID 是 `com.zxfd.oceandemo`。
+
+### 6.1 准备 Apple ID
+
+1. 在 <https://appleid.apple.com> 注册 Apple ID，并完成邮箱和手机号验证。
+2. 为 Apple ID 开启双重认证；Apple Developer 和 Xcode 登录通常要求双重认证。
+3. 在 Mac 上打开 Xcode → `Settings` → `Accounts` → `+`，登录该 Apple ID。
+4. 连接 iPhone/iPad，首次连接时在设备上选择“信任此电脑”。
+5. iOS 16 及以上设备在“设置 → 隐私与安全性 → 开发者模式”中开启开发者模式。
+
+### 6.2 免费个人账号的适用范围
+
+没有加入 Apple Developer Program 时，Xcode 可以使用 Personal Team 进行本地真机调试，但存在限制：
+
+- 签名和安装有效期较短，通常需要定期重新运行；
+- 可用的设备、App ID 和系统能力受到限制；
+- 不能用于 TestFlight、App Store 发布和团队正式分发；
+- Universal Link、Push、部分第三方回跳能力可能还需要付费开发者团队配置。
+
+因此，免费 Apple ID 只适合当前阶段的个人真机联调。多人协作、长期测试、TestFlight 或正式发布需要加入 Apple Developer Program。
+
+### 6.3 Xcode 真机签名配置
+
+在 Xcode 中打开 `OceanDemo.xcodeproj`：
+
+1. 选择 `OceanDemo` Target → `Signing & Capabilities`。
+2. 勾选 `Automatically manage signing`。
+3. 在 `Team` 中选择刚登录的 Personal Team 或公司开发团队。
+4. 如果 Bundle ID 冲突，将 `com.zxfd.oceandemo` 改为团队内唯一的 Bundle ID。
+5. 将运行目标切换为已连接的 iPhone/iPad，点击 Run。
+6. 首次运行若提示开发者不受信任，按设备提示完成信任操作后重新运行。
+
+### 6.4 什么时候需要付费 Apple Developer Program
+
+以下需求需要公司或个人加入 Apple Developer Program，并由团队管理员统一管理证书和权限：
+
+- 长期真机测试和多人协作；
+- TestFlight 内测；
+- Universal Link、Push、Associated Domains 等能力；
+- 生成正式签名的 `.app`、`.framework` 或 `.xcarchive`；
+- App Store 发布。
+
+仅将 Demo 源码上传到 GitHub，或使用 Xcode Simulator 编译，不需要 Apple ID、Apple App ID 或签名证书；但本节所述的真机测试需要至少一个可登录 Xcode 的 Apple ID。
 
 ## 7. iOS SDK 依赖现状
 

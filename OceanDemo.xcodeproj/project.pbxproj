@@ -50,7 +50,7 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		A00000000000000000000081 /* XCLocalSwiftPackageReference "ocean-ios-sdk" */ = {isa = XCLocalSwiftPackageReference; relativePath = ../ocean-ios-sdk; };
+		A00000000000000000000081 /* XCLocalSwiftPackageReference "ocean-ios-sdk" */ = {isa = XCLocalSwiftPackageReference; relativePath = ocean-ios-sdk; };
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */

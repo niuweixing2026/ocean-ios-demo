@@ -1,0 +1,59 @@
+name: iOS Demo Simulator
+
+on:
+  push:
+    branches:
+      - test
+  workflow_dispatch:
+
+jobs:
+  build-and-simulate:
+    runs-on: macos-14
+    timeout-minutes: 30
+
+    steps:
+      - name: 检出 Demo 代码
+        uses: actions/checkout@v5
+
+      - name: 检出私有 iOS SDK
+        uses: actions/checkout@v5
+        with:
+          repository: niuweixing2026/ocean-ios-sdk
+          token: ${{ secrets.OCEAN_IOS_SDK_TOKEN }}
+          path: ocean-ios-sdk
+
+      - name: 查看 Xcode 版本
+        run: xcodebuild -version
+
+      - name: 查看工程 Scheme
+        run: xcodebuild -project OceanDemo.xcodeproj -list
+
+      - name: 构建 iOS Simulator App
+        run: >-
+          xcodebuild
+          -project OceanDemo.xcodeproj
+          -scheme OceanDemo
+          -destination "generic/platform=iOS Simulator"
+          -configuration Debug
+          -derivedDataPath build/DerivedData
+          build
+
+      - name: 启动模拟器并运行 Demo
+        run: |
+          DEVICE_ID=$(xcrun simctl list devices available | grep -m 1 -E 'iPhone.*\(.*\)' | sed -E 's/.*\(([A-F0-9-]+)\).*/\1/')
+          test -n "$DEVICE_ID"
+          xcrun simctl boot "$DEVICE_ID" || true
+          xcrun simctl bootstatus "$DEVICE_ID" -b
+          xcrun simctl install "$DEVICE_ID" build/DerivedData/Build/Products/Debug-iphonesimulator/OceanDemo.app
+          xcrun simctl launch "$DEVICE_ID" com.zxfd.oceandemo
+          xcrun simctl io "$DEVICE_ID" screenshot build/simulator.png
+
+      - name: 上传构建结果
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-demo-simulator-result
+          path: |
+            build/DerivedData/Build/Products/Debug-iphonesimulator/OceanDemo.app
+            build/simulator.png
+          if-no-files-found: warn

@@ -262,8 +262,19 @@ struct PaymentView: View {
             .background(Color(red: 0.96, green: 0.97, blue: 0.98).ignoresSafeArea())
             .navigationTitle("支付 Demo")
             .background {
-                NavigationLink(item: $model.paymentResult) { value in
-                    ResultView(result: value.result)
+                NavigationLink(isActive: Binding(
+                    get: { model.paymentResult != nil },
+                    set: { isPresented in
+                        if !isPresented {
+                            model.paymentResult = nil
+                        }
+                    }
+                )) {
+                    if let paymentResult = model.paymentResult {
+                        ResultView(result: paymentResult.result)
+                    } else {
+                        EmptyView()
+                    }
                 } label: {
                     EmptyView()
                 }

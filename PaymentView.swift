@@ -3,9 +3,29 @@ import SwiftUI
 import UIKit
 import OceanPaySDK
 
-private let payEndpoint = URL(string: "https://pay.360lingqian.com/gatewayTest")!
-private let appCompURL = payEndpoint.appendingPathComponent("pri/V2/Pay/mock/appComp")
-private let appPrepayURL = payEndpoint.appendingPathComponent("pri/V2/Pay/mock/appPrepayOrder")
+enum DemoPaymentConfiguration {
+    static let returnScheme = "oceandemoios"
+    static let returnURL = "\(returnScheme)://payment-result"
+}
+
+enum DemoEnvironment: String, CaseIterable, Identifiable {
+    case dev, test, prod
+
+    var id: String { rawValue }
+    var endpoint: URL {
+        switch self {
+        case .dev: URL(string: "https://pay.360lingqian.com/gatewayTest")!
+        case .test: URL(string: "https://pay.360lingqian.com/gatewayTest")!
+        case .prod: URL(string: "https://pay.360lingqian.com/gateway")!
+        }
+    }
+
+    var compId: String { self == .dev ? "CP000238914527" : "" }
+    var prodId: String { self == .dev ? "PD000294503861" : "" }
+    var merchantName: String { self == .dev ? "通联支付测试商户" : "" }
+    var productName: String { self == .dev ? "通联支付测试商户" : "" }
+    func api(_ path: String) -> URL { endpoint.appendingPathComponent("pri/V2/Pay/mock/\(path)") }
+}
 
 struct DemoData: Codable {
     var compId = ""
@@ -76,25 +96,34 @@ final class PaymentViewModel: ObservableObject {
     @Published var data = DemoData()
     @Published var amount = "1"
     @Published var currency = "USD"
+    @Published var environment: DemoEnvironment = .dev
     @Published var message = "正在加载商户数据..."
     @Published var isLoading = false
     @Published var paymentResult: DemoPaymentResult?
     weak var presenter: UIViewController?
-    private var sdkConfigured = false
+    private var loadSequence = 0
 
     func load() {
+        loadSequence += 1
+        let sequence = loadSequence
+        let selectedEnvironment = environment
         isLoading = true
-        message = "正在加载商户数据..."
-        post(url: appCompURL, body: [:]) { [weak self] result in
+        data = DemoData()
+        message = "正在加载\(selectedEnvironment.rawValue)环境商户数据..."
+        post(url: selectedEnvironment.api("appComp"), body: [:]) { [weak self] result in
             Task { @MainActor in
-                guard let self else { return }
+                guard let self, self.loadSequence == sequence else { return }
                 self.isLoading = false
                 do {
                     let payload = try result.get()
                     self.data = try JSONDecoder().decode(DemoData.self, from: payload)
+                    if !selectedEnvironment.compId.isEmpty { self.data.compId = selectedEnvironment.compId }
+                    if !selectedEnvironment.prodId.isEmpty { self.data.prodId = selectedEnvironment.prodId }
+                    if !selectedEnvironment.merchantName.isEmpty { self.data.compName = selectedEnvironment.merchantName }
+                    if !selectedEnvironment.productName.isEmpty { self.data.prodName = selectedEnvironment.productName }
                     self.amount = self.data.money.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "1" : self.data.money
                     self.currency = self.data.coin.first?.uppercased() ?? "USD"
-                    self.message = "商户数据加载完成"
+                    self.message = "\(selectedEnvironment.rawValue)环境商户数据加载完成"
                 } catch {
                     self.message = "加载失败：\(error.localizedDescription)，请重试"
                 }
@@ -103,6 +132,7 @@ final class PaymentViewModel: ObservableObject {
     }
 
     func pay() {
+        let selectedEnvironment = environment
         let trimmedAmount = amount.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedCoin = currency.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
         guard !data.compId.isEmpty, !data.prodId.isEmpty else {
@@ -131,18 +161,17 @@ final class PaymentViewModel: ObservableObject {
             "remark": data.body,
             "sourceType": "IOS",
             "osType": "IOS",
-            "iosReturnUrl": "https://www.heqipay.com"
+            "iosReturnUrl": DemoPaymentConfiguration.returnURL
         ]
-        post(url: appPrepayURL, body: body) { [weak self, presenter] result in
+        post(url: selectedEnvironment.api("appPrepayOrder"), body: body) { [weak self, presenter] result in
             Task { @MainActor in
                 guard let self else { return }
                 self.isLoading = false
                 do {
                     let orderPackage = try result.get()
-                    if !self.sdkConfigured {
-                        try OceanPaySDK.shared.configure(OceanPayOptions(endpoint: payEndpoint))
-                        self.sdkConfigured = true
-                    }
+                    try OceanPaySDK.shared.configure(OceanPayOptions(
+                        diagnosticLogsEnabled: true, alipayScheme: DemoPaymentConfiguration.returnScheme
+                    ))
                     try OceanPaySDK.shared.present(orderPackage: orderPackage, from: presenter) { [weak self] result in
                         Task { @MainActor in
                             self?.paymentResult = DemoPaymentResult(result: result)
@@ -218,6 +247,16 @@ struct PaymentView: View {
                         readOnly("商户", displayValue(model.data.compId, model.data.compName))
                         readOnly("产品", displayValue(model.data.prodId, model.data.prodName))
                         readOnly("商品名称/订单说明", model.data.body)
+                    }
+
+                    DemoCard(title: "运行环境") {
+                        Picker("环境", selection: $model.environment) {
+                            ForEach(DemoEnvironment.allCases) { environment in
+                                Text(environment.rawValue).tag(environment)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .onChange(of: model.environment) { _ in model.load() }
                     }
 
                     DemoCard(title: "支付参数") {

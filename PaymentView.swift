@@ -14,7 +14,7 @@ enum DemoEnvironment: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var endpoint: URL {
         switch self {
-        case .dev: URL(string: "https://pay.360lingqian.com/gatewayTest")!
+        case .dev: URL(string: "https://pay.360lingqian.com/gydev")!
         case .test: URL(string: "https://pay.360lingqian.com/gatewayTest")!
         case .prod: URL(string: "https://pay.360lingqian.com/gateway")!
         }
